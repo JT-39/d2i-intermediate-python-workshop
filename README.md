@@ -46,3 +46,5 @@ for table, df in dfs.items():
 db.commit()
 db.close()
  ```
+
+ Notes can be found with Will's repo https://github.com/data-to-insight/ERN-sessions/tree/main/intermediate_python, inside the relevant `.ipynb` file.
