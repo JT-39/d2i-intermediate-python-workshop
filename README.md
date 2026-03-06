@@ -19,3 +19,30 @@ A strong emphasis is placed on:
 - Professional syntax, formatting, and best practices  
 
 This course builds on beginner-level Python and focuses on writing code suitable for real analytics and data engineering workflows.
+
+## Session 1
+
+Using this repo:
+
+https://github.com/data-to-insight/ERN-sessions/tree/main/intermediate_python
+
+Two databases:
+
+- `903_database.db`
+- `gravity.db`
+
+Code to setup a database from an Excel file:
+
+```python
+import pandas as pd
+import sqlite3
+
+
+# Run this to make the 903 database file
+db = sqlite3.connect("903_database.db")
+dfs = pd.read_excel("/workspaces/ERN-sessions/data/903_xlsx.xlsx", sheet_name=None)
+for table, df in dfs.items():
+    df.to_sql(table, db)
+db.commit()
+db.close()
+ ```
