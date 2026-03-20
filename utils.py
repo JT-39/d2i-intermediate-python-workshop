@@ -1,18 +1,19 @@
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from config_903 import DateCols903, EthnicSubcategories
+import numpy as np
+
 
 def format_dates(column):
     # Replace empty strings with NaT and fill NaN values with NaT
     column.replace(r"^\s*$", pd.NaT, regex=True)
-    column=column.fillna(pd.NaT)
+    column = column.fillna(pd.NaT)
     try:
         column = pd.to_datetime(column, format="%d/%m/%Y")
         return column
     except:
-        raise ValueError(
-            f"Unknown date format in {column.name}, expected dd/mm/YYYY"
-        )
+        raise ValueError(f"Unknown date format in {column.name}, expected dd/mm/YYYY")
+
 
 def calculate_age_buckets(age):
     # Used to make age buckets matching published data
@@ -28,6 +29,7 @@ def calculate_age_buckets(age):
         return "e) 16 years and over"
     else:
         return "f) Age error"
+
 
 def clean_903_table(df: pd.DataFrame, collection_end: pd.Timestamp):
     """
@@ -49,7 +51,7 @@ def clean_903_table(df: pd.DataFrame, collection_end: pd.Timestamp):
 
     """
     clean_df = df.copy()
-    
+
     # Drop index column if it exists
     if "index" in clean_df.columns:
         clean_df.drop("index", axis=1, inplace=True)
@@ -70,6 +72,83 @@ def clean_903_table(df: pd.DataFrame, collection_end: pd.Timestamp):
         clean_df["AGE"] = clean_df["DOB_dt"].apply(
             lambda dob: relativedelta(dt1=collection_end, dt2=dob).normalized().years
         )
-        clean_df["AGE_BUCKETS"] = clean_df['AGE'].apply(calculate_age_buckets)
+        clean_df["AGE_BUCKETS"] = clean_df["AGE"].apply(calculate_age_buckets)
 
     return clean_df
+
+
+def group_calculation(df, col_to_group, measure_name):
+    df = df.copy()
+    grouped = df.groupby([col_to_group]).size()
+    grouped = grouped.to_frame("Count").reset_index()
+    grouped = grouped.rename(columns={col_to_group: "Value"})
+
+    grouped["Percentage"] = (grouped["Count"] / grouped["Count"].sum()) * 100
+
+    grouped["Measure"] = measure_name
+
+    grouped_ordered = grouped[["Measure", "Value", "Count", "Percentage"]]
+
+    return grouped_ordered
+
+
+def time_difference(start_col, end_col, business_days=False):
+    if business_days:
+        time_diff = np.busday_count(
+            start_col.values.astype("datetime64[D]"),
+            end_col.values.astype("datetime64[D]"),
+        )
+    else:
+        time_diff = end_col - start_col
+        time_diff = time_diff / pd.Timedelta(days=1)
+
+    return time_diff.astype("int")
+
+
+def multiples_same_event(df, event_name):
+    df = df.copy()
+    multiples = df.groupby(["CHILD"]).size().to_frame("Number of events").reset_index()
+    multiples = (
+        multiples.groupby("Number of events")
+        .size()
+        .to_frame("Children with number of events")
+        .reset_index()
+    )
+    multiples["Event type"] = event_name
+    multiples = multiples[
+        ["Event type", "Number of events", "Children with number of events"]
+    ]
+    return multiples
+
+
+def group_calculation_year(df, year_col, col_to_group, measure_name):
+    df = df.copy()
+    grouped = df.groupby([year_col, col_to_group])
+    grouped = grouped.size().to_frame("Count").reset_index()
+    grouped = grouped.rename(columns={col_to_group: "Value"})
+
+    grouped["Percentage by year"] = grouped.apply(
+        lambda row: (
+            row["Count"]
+            / grouped.loc[grouped[year_col] == row[year_col]].Count.sum()
+            * 100
+        ),
+        axis=1,
+    )
+
+    grouped["Measure"] = measure_name
+
+    grouped = grouped[[year_col, "Measure", "Value", "Count", "Percentage by year"]]
+
+    return grouped
+
+
+def appears_on_both(df1, df2, measure_name):
+    df1 = df1.drop_duplicates(subset=["CHILD"]).copy()
+    df2 = df2.drop_duplicates(subset=["CHILD"]).copy()
+    merged_df = df1.merge(df2, on=["CHILD"], how="inner")
+    merged_df["on_both"] = "Yes"
+    df = df1.merge(merged_df[["CHILD", "on_both"]], on="CHILD", how="left")
+    df.fillna({"on_both": "No"}, inplace=True)
+    output = group_calculation(df, "on_both", measure_name)
+    return output
