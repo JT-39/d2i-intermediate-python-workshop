@@ -120,7 +120,6 @@ def calculate_age_buckets(age):
     else:
         return "f) Age error"
 
-
 def clean_903_table(df: pd.DataFrame, collection_end: pd.Timestamp):
     df = df.copy()
     clean_df = df.copy()
@@ -269,27 +268,18 @@ def appears_on_both(df1, df2, measure_name):
 
     return output
 
-
 # Main pipeline
-st.title("903 Pipeline App")
+st.title("903 pipeline app")
 
-upload = st.file_uploader("Upload 903 data here")
+upload = st.file_uploader("Upload 903 here")
 
 if upload:
-    # Successful file upload message
     st.write("File uploaded")
 
-    # Read all sheets
     dfs = pd.read_excel(upload, sheet_name=None)
 
-    @st.cache_data
-    def clean_function():
-        for key, df in dfs.items():
-            st.write(f"Processing sheet: {key}")
-            dfs[key] = clean_903_table(df, collection_end)
-        return dfs
-    
-    dfs = clean_function()
+    for key, df in dfs.items():
+        dfs[key] = clean_903_table(df, collection_end=collection_end)
 
     measures = {}
 
@@ -303,7 +293,6 @@ if upload:
 
     measures["ad1 by age"] = group_calculation(dfs["ad1"], "AGE_BUCKETS", "Ad1 - Age")
 
-    # Create measures list output table
     output_table = pd.concat(
         list(measures.values())
     )
@@ -311,59 +300,54 @@ if upload:
     output_table[["List", "Measure"]] = output_table["Measure"].str.split(" - ", expand=True, n=1)
     output_table = output_table[["List", "Measure", "Value", "Count", "Percentage"]]
 
-    # Display the output table
-    with st.expander("Download output", expanded=False):
-        output_csv = output_table.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="Download processed data as CSV",
-            data=output_csv,
-            file_name="processed_903.csv"
-        )
+    with st.expander("Download ouput"):
+        output_csv = output_table.to_csv(index=False)
+        st.download_button("Download processed data", output_csv, file_name="Processed 903.csv")
         st.table(output_table)
-    
-    # Plot the output table as bar
+
     with st.expander("Plots"):
-        plot_table = output_table[
-            (output_table["List"]=="Header") &
-             (output_table["Measure"]=="Age")
-        ]
+        plot_table = output_table[(output_table["List"] == "Header")
+                                  & (output_table["Measure"] == "Age")]
+        
         bar = px.bar(
             plot_table,
             x="Value",
             y="Count",
-            title="Header by Age",
-            labels={"Value": "Age", "Count": "Number of Children"}
+            title="Header by age",
+            labels={"Value":"Age",
+                    "Count":"Number of children"}
         )
+
         st.plotly_chart(bar)
 
-    # Allow slicing
     with st.sidebar:
-        st.write("Slices")
-
+        st.write("Make slices here")
+        
         list_options = output_table["List"].unique()
         list_selected = st.sidebar.radio(
-            "Select list:", list_options
+            "Selcted list:", list_options
         )
 
-        # Dynamic measure options based on list selection
-        measure_options = output_table[output_table["List"]==list_selected]["Measure"].unique()
+        measure_options = output_table["Measure"][output_table["List"] == list_selected].unique()
         measure_selected = st.sidebar.radio(
             "Select measure:", measure_options
         )
-    
-    with st.expander("Sliced plots"):
-        plot_table = output_table[
-            (output_table["List"]==list_selected) &
-             (output_table["Measure"]==measure_selected)
-        ]
+
+    with st.expander("SLiced Plots"):
+        plot_table = output_table[(output_table["List"] == list_selected)
+                                  & (output_table["Measure"] == measure_selected)]
+        
         bar = px.bar(
             plot_table,
             x="Value",
             y="Count",
             title=f"{list_selected} by {measure_selected}",
-            labels={"Value": measure_selected, "Count": "Number of Children"}
+            labels={"Value":measure_selected,
+                    "Count":"Number of children"}
         )
+
         st.plotly_chart(bar, use_container_width=True)
+
 `,
     },
   },
